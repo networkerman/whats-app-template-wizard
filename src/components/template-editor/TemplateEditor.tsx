@@ -14,7 +14,7 @@ import { HTML5Backend } from "react-dnd-html5-backend";
 
 const TemplateEditor = () => {
   const [activeTab, setActiveTab] = useState<string>("edit");
-  const { template, validateTemplate, saveTemplate, reorderSections } = useTemplate();
+  const { template, validateTemplate, saveTemplate, reorderSections, addSection } = useTemplate();
   const [previewVariables, setPreviewVariables] = useState<Record<string, string>>({});
 
   const handleSave = async () => {
@@ -33,6 +33,15 @@ const TemplateEditor = () => {
 
   const handleVariablesChange = (variables: Record<string, string>) => {
     setPreviewVariables(variables);
+  };
+
+  const handleAddSection = (type: string, format?: string) => {
+    try {
+      addSection(type, format);
+      toast.success(`${type} section added successfully`);
+    } catch (error) {
+      toast.error(`Failed to add ${type} section`);
+    }
   };
 
   return (
@@ -59,9 +68,7 @@ const TemplateEditor = () => {
               <TabsContent value="edit" className="p-0 m-0">
                 <div className="p-6">
                   <DragDropInterface 
-                    onAddSection={(type, format) => {
-                      // Handle section addition
-                    }}
+                    onAddSection={handleAddSection}
                     onReorder={reorderSections}
                   />
                 </div>

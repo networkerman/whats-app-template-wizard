@@ -88,11 +88,10 @@ export const TemplateProvider = ({ children }: { children: ReactNode }) => {
       newSection.product = {};
     }
     
-    // Check if the section type already exists (for unique sections)
+    // Check if the section type already exists
     const existingIndex = template.sections.findIndex(section => section.type === type);
     
-    // If body exists (required) or only one of each type is allowed
-    if ((type === "header" || type === "body" || type === "footer") && existingIndex !== -1) {
+    if (existingIndex !== -1) {
       // Replace the existing section
       const updatedSections = [...template.sections];
       updatedSections[existingIndex] = newSection;
