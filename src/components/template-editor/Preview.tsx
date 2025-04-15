@@ -1,25 +1,15 @@
-
 import { useTemplate } from "@/contexts/TemplateContext";
 import { formatVariables } from "@/utils/templateUtils";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Smartphone } from "lucide-react";
 
-const Preview = () => {
-  const { template } = useTemplate();
-  const [previewVariables, setPreviewVariables] = useState<Record<string, string>>({});
-  const [showVariableEditor, setShowVariableEditor] = useState(false);
-  
-  const handleVariableChange = (key: string, value: string) => {
-    setPreviewVariables((prev) => ({
-      ...prev,
-      [key]: value
-    }));
-  };
+interface PreviewProps {
+  variables: Record<string, string>;
+}
 
+const Preview = ({ variables }: PreviewProps) => {
+  const { template } = useTemplate();
+  
   const renderHeader = () => {
     const headerSection = template.sections.find(section => section.type === "header");
     if (!headerSection) return null;
@@ -27,7 +17,7 @@ const Preview = () => {
     if (headerSection.format === "text") {
       return (
         <div className="text-sm font-medium mb-2">
-          {formatVariables(headerSection.text || "", previewVariables)}
+          {formatVariables(headerSection.text || "", variables)}
         </div>
       );
     }
@@ -44,6 +34,18 @@ const Preview = () => {
       );
     }
 
+    if (headerSection.format === "video") {
+      return (
+        <div className="mb-3">
+          <video 
+            src={headerSection.url || "https://example.com/video.mp4"} 
+            className="w-full rounded-t-lg h-48 object-cover"
+            controls
+          />
+        </div>
+      );
+    }
+
     return null;
   };
   
@@ -53,7 +55,7 @@ const Preview = () => {
     
     return (
       <div className="text-sm mb-3 whitespace-pre-line">
-        {formatVariables(bodySection.text || "", previewVariables)}
+        {formatVariables(bodySection.text || "", variables)}
       </div>
     );
   };
@@ -64,7 +66,7 @@ const Preview = () => {
     
     return (
       <div className="text-xs text-gray-500 mt-2">
-        {formatVariables(footerSection.text || "", previewVariables)}
+        {formatVariables(footerSection.text || "", variables)}
       </div>
     );
   };
@@ -80,32 +82,44 @@ const Preview = () => {
             key={index}
             className="w-full py-2 px-3 bg-white border border-gray-300 text-sm rounded-md text-center hover:bg-gray-50"
           >
-            {button.text}
+            {formatVariables(button.text || "", variables)}
           </button>
         ))}
       </div>
     );
   };
 
-  const extractVariables = () => {
-    const variables: string[] = [];
+  const renderProduct = () => {
+    const productSection = template.sections.find(section => section.type === "product");
+    if (!productSection || !productSection.product) return null;
     
-    template.sections.forEach(section => {
-      if (section.text) {
-        const matches = section.text.match(/\{\{([^}]+)\}\}/g) || [];
-        matches.forEach(match => {
-          const varName = match.replace(/\{\{|\}\}/g, '');
-          if (!variables.includes(varName)) {
-            variables.push(varName);
-          }
-        });
-      }
-    });
+    const product = productSection.product;
     
-    return variables;
+    return (
+      <div className="mt-3 border rounded-lg overflow-hidden">
+        <img 
+          src={product.imageUrl || "https://placehold.co/300x300?text=Product"} 
+          alt={product.name} 
+          className="w-full h-48 object-cover"
+        />
+        <div className="p-3">
+          <h4 className="font-medium">{formatVariables(product.name || "", variables)}</h4>
+          <p className="text-sm text-gray-600 mt-1">
+            {formatVariables(product.description || "", variables)}
+          </p>
+          <div className="flex justify-between items-center mt-2">
+            <span className="font-medium">{formatVariables(product.price || "", variables)}</span>
+            <a 
+              href={formatVariables(product.url || "#", variables)}
+              className="text-sm text-blue-500 hover:underline"
+            >
+              View Product
+            </a>
+          </div>
+        </div>
+      </div>
+    );
   };
-  
-  const variables = extractVariables();
 
   return (
     <div className="flex flex-col items-center">
@@ -121,6 +135,7 @@ const Preview = () => {
               {renderBody()}
               {renderFooter()}
               {renderButtons()}
+              {renderProduct()}
               
               {template.sections.length === 0 && (
                 <div className="text-center py-8 text-gray-400 text-sm">
@@ -131,38 +146,6 @@ const Preview = () => {
           </ScrollArea>
         </div>
       </div>
-      
-      {variables.length > 0 && (
-        <>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => setShowVariableEditor(!showVariableEditor)}
-            className="mb-4"
-          >
-            {showVariableEditor ? "Hide" : "Edit"} Variables
-          </Button>
-          
-          {showVariableEditor && (
-            <div className="w-full border rounded-md p-4 bg-white">
-              <h4 className="text-sm font-medium mb-3">Template Variables</h4>
-              <div className="space-y-2">
-                {variables.map((variable) => (
-                  <div key={variable} className="grid grid-cols-12 gap-2 items-center">
-                    <Label className="col-span-5 text-xs">{`{{${variable}}}`}</Label>
-                    <Input 
-                      className="col-span-7 h-8 text-xs"
-                      placeholder="Variable value"
-                      value={previewVariables[variable] || ""}
-                      onChange={(e) => handleVariableChange(variable, e.target.value)}
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </>
-      )}
     </div>
   );
 };

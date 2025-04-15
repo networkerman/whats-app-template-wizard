@@ -1,78 +1,101 @@
-
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
-import EditorSidebar from "./EditorSidebar";
-import EditorContent from "./EditorContent";
-import Preview from "./Preview";
-import { useTemplate } from "@/contexts/TemplateContext";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { useTemplate } from "@/contexts/TemplateContext";
 import TemplateHeader from "./TemplateHeader";
+import DragDropInterface from "./DragDropInterface";
+import VariableEditor from "./VariableEditor";
+import ApprovalWorkflow from "./ApprovalWorkflow";
+import Preview from "./Preview";
+import { DndProvider } from "react-dnd";
+import { HTML5Backend } from "react-dnd-html5-backend";
 
 const TemplateEditor = () => {
   const [activeTab, setActiveTab] = useState<string>("edit");
-  const { template, validateTemplate } = useTemplate();
+  const { template, validateTemplate, saveTemplate, reorderSections } = useTemplate();
+  const [previewVariables, setPreviewVariables] = useState<Record<string, string>>({});
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const validationResult = validateTemplate();
     if (validationResult.valid) {
-      toast.success("Template saved successfully!");
+      try {
+        await saveTemplate();
+        toast.success("Template saved successfully!");
+      } catch (error) {
+        toast.error("Failed to save template");
+      }
     } else {
       toast.error(`Template has errors: ${validationResult.message}`);
     }
   };
 
+  const handleVariablesChange = (variables: Record<string, string>) => {
+    setPreviewVariables(variables);
+  };
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-      <div className="lg:col-span-8">
-        <Card className="overflow-hidden border-none shadow-md">
-          <TemplateHeader />
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <div className="border-b px-6">
-              <TabsList className="bg-transparent">
-                <TabsTrigger value="edit" className="data-[state=active]:bg-white data-[state=active]:shadow-none">
-                  Edit Template
-                </TabsTrigger>
-                <TabsTrigger value="code" className="data-[state=active]:bg-white data-[state=active]:shadow-none">
-                  Template JSON
-                </TabsTrigger>
-              </TabsList>
-            </div>
-            <TabsContent value="edit" className="p-0 m-0">
-              <div className="grid grid-cols-12 h-[calc(100vh-230px)]">
-                <div className="col-span-4 border-r bg-gray-50">
-                  <EditorSidebar />
-                </div>
-                <div className="col-span-8 overflow-auto">
-                  <EditorContent />
-                </div>
+    <DndProvider backend={HTML5Backend}>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="lg:col-span-8">
+          <Card className="overflow-hidden border-none shadow-md">
+            <TemplateHeader />
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <div className="border-b px-6">
+                <TabsList className="bg-transparent">
+                  <TabsTrigger value="edit" className="data-[state=active]:bg-white data-[state=active]:shadow-none">
+                    Edit Template
+                  </TabsTrigger>
+                  <TabsTrigger value="variables" className="data-[state=active]:bg-white data-[state=active]:shadow-none">
+                    Variables
+                  </TabsTrigger>
+                  <TabsTrigger value="approval" className="data-[state=active]:bg-white data-[state=active]:shadow-none">
+                    Approval
+                  </TabsTrigger>
+                </TabsList>
               </div>
-            </TabsContent>
-            <TabsContent value="code" className="p-6 m-0">
-              <pre className="bg-gray-100 p-4 rounded-md overflow-auto h-[calc(100vh-300px)]">
-                {JSON.stringify(template, null, 2)}
-              </pre>
-            </TabsContent>
-          </Tabs>
-        </Card>
-        <div className="flex justify-end gap-2 mt-4">
-          <Button variant="outline">Cancel</Button>
-          <Button onClick={handleSave}>Save Template</Button>
+              
+              <TabsContent value="edit" className="p-0 m-0">
+                <div className="p-6">
+                  <DragDropInterface 
+                    onAddSection={(type, format) => {
+                      // Handle section addition
+                    }}
+                    onReorder={reorderSections}
+                  />
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="variables" className="p-6 m-0">
+                <VariableEditor onVariablesChange={handleVariablesChange} />
+              </TabsContent>
+              
+              <TabsContent value="approval" className="p-6 m-0">
+                <ApprovalWorkflow />
+              </TabsContent>
+            </Tabs>
+          </Card>
+          
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline">Cancel</Button>
+            <Button onClick={handleSave}>Save Template</Button>
+          </div>
+        </div>
+        
+        <div className="lg:col-span-4">
+          <Card className="h-full border-none shadow-md">
+            <div className="p-6 border-b">
+              <h3 className="font-semibold">Preview</h3>
+              <p className="text-sm text-gray-500">See how your template will appear in WhatsApp</p>
+            </div>
+            <div className="p-6 bg-gray-50 h-[calc(100vh-200px)] overflow-auto">
+              <Preview variables={previewVariables} />
+            </div>
+          </Card>
         </div>
       </div>
-      <div className="lg:col-span-4">
-        <Card className="h-full border-none shadow-md">
-          <div className="p-6 border-b">
-            <h3 className="font-semibold">Preview</h3>
-            <p className="text-sm text-gray-500">See how your template will appear in WhatsApp</p>
-          </div>
-          <div className="p-6 bg-gray-50 h-[calc(100vh-200px)] overflow-auto">
-            <Preview />
-          </div>
-        </Card>
-      </div>
-    </div>
+    </DndProvider>
   );
 };
 

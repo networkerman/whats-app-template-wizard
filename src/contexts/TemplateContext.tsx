@@ -1,4 +1,3 @@
-
 import { createContext, useContext, ReactNode, useState } from "react";
 import { validateTemplateRules } from "@/utils/templateUtils";
 
@@ -10,14 +9,21 @@ interface TemplateSection {
   buttons?: any[];
   product?: any;
   recommendationType?: string;
+  variables?: string[];
 }
 
 interface Template {
+  id?: string;
   name: string;
   language: string;
   category: string;
   sections: TemplateSection[];
   errors: string[];
+  status: 'draft' | 'approved' | 'live';
+  version: number;
+  lastEdited: Date;
+  activeCampaigns: string[];
+  variables: Record<string, string>;
 }
 
 interface TemplateContextType {
@@ -26,7 +32,13 @@ interface TemplateContextType {
   addSection: (type: string, format?: string) => void;
   updateSection: (index: number, section: TemplateSection) => void;
   removeSection: (index: number) => void;
+  reorderSections: (fromIndex: number, toIndex: number) => void;
   validateTemplate: () => { valid: boolean; message?: string };
+  saveTemplate: () => Promise<void>;
+  approveTemplate: () => Promise<void>;
+  getTemplateHistory: () => Template[];
+  getActiveCampaigns: () => string[];
+  updateVariables: (variables: Record<string, string>) => void;
 }
 
 const TemplateContext = createContext<TemplateContextType | undefined>(undefined);
@@ -38,10 +50,21 @@ export const TemplateProvider = ({ children }: { children: ReactNode }) => {
     category: "marketing",
     sections: [],
     errors: [],
+    status: "draft",
+    version: 1,
+    lastEdited: new Date(),
+    activeCampaigns: [],
+    variables: {},
   });
 
+  const [templateHistory, setTemplateHistory] = useState<Template[]>([]);
+
   const updateTemplateMeta = (field: string, value: string) => {
-    setTemplate((prev) => ({ ...prev, [field]: value }));
+    setTemplate((prev) => ({ 
+      ...prev, 
+      [field]: value,
+      lastEdited: new Date(),
+    }));
   };
 
   const addSection = (type: string, format?: string) => {
@@ -73,12 +96,17 @@ export const TemplateProvider = ({ children }: { children: ReactNode }) => {
       // Replace the existing section
       const updatedSections = [...template.sections];
       updatedSections[existingIndex] = newSection;
-      setTemplate((prev) => ({ ...prev, sections: updatedSections }));
+      setTemplate((prev) => ({ 
+        ...prev, 
+        sections: updatedSections,
+        lastEdited: new Date(),
+      }));
     } else {
       // Add new section
       setTemplate((prev) => ({ 
         ...prev, 
         sections: [...prev.sections, newSection],
+        lastEdited: new Date(),
       }));
     }
     
@@ -93,6 +121,7 @@ export const TemplateProvider = ({ children }: { children: ReactNode }) => {
     setTemplate((prev) => ({ 
       ...prev, 
       sections: updatedSections,
+      lastEdited: new Date(),
     }));
     
     // Validate the template after updating a section
@@ -111,10 +140,23 @@ export const TemplateProvider = ({ children }: { children: ReactNode }) => {
     setTemplate((prev) => ({ 
       ...prev, 
       sections: updatedSections,
+      lastEdited: new Date(),
     }));
     
     // Validate the template after removing a section
     validateTemplate();
+  };
+
+  const reorderSections = (fromIndex: number, toIndex: number) => {
+    const updatedSections = [...template.sections];
+    const [movedSection] = updatedSections.splice(fromIndex, 1);
+    updatedSections.splice(toIndex, 0, movedSection);
+    
+    setTemplate((prev) => ({ 
+      ...prev, 
+      sections: updatedSections,
+      lastEdited: new Date(),
+    }));
   };
 
   const validateTemplate = () => {
@@ -131,6 +173,58 @@ export const TemplateProvider = ({ children }: { children: ReactNode }) => {
     };
   };
 
+  const saveTemplate = async () => {
+    // Save current version to history
+    setTemplateHistory(prev => [...prev, template]);
+    
+    // Increment version and update status
+    setTemplate(prev => ({
+      ...prev,
+      version: prev.version + 1,
+      status: "draft",
+      lastEdited: new Date(),
+    }));
+  };
+
+  const approveTemplate = async () => {
+    if (template.status === "live") {
+      // Check if template was edited in the last 24 hours
+      const lastEditTime = new Date(template.lastEdited).getTime();
+      const now = new Date().getTime();
+      const hoursSinceLastEdit = (now - lastEditTime) / (1000 * 60 * 60);
+      
+      if (hoursSinceLastEdit < 24) {
+        throw new Error("Template can only be edited once every 24 hours when live");
+      }
+    }
+    
+    // Save current version to history
+    setTemplateHistory(prev => [...prev, template]);
+    
+    // Update status to approved
+    setTemplate(prev => ({
+      ...prev,
+      status: "approved",
+      lastEdited: new Date(),
+    }));
+  };
+
+  const getTemplateHistory = () => {
+    return templateHistory;
+  };
+
+  const getActiveCampaigns = () => {
+    return template.activeCampaigns;
+  };
+
+  const updateVariables = (variables: Record<string, string>) => {
+    setTemplate(prev => ({
+      ...prev,
+      variables,
+      lastEdited: new Date(),
+    }));
+  };
+
   return (
     <TemplateContext.Provider
       value={{
@@ -139,7 +233,13 @@ export const TemplateProvider = ({ children }: { children: ReactNode }) => {
         addSection,
         updateSection,
         removeSection,
+        reorderSections,
         validateTemplate,
+        saveTemplate,
+        approveTemplate,
+        getTemplateHistory,
+        getActiveCampaigns,
+        updateVariables,
       }}
     >
       {children}
